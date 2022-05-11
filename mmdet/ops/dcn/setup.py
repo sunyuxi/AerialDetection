@@ -12,4 +12,4 @@ setup(
             'deform_pool_cuda',
             ['src/deform_pool_cuda.cpp', 'src/deform_pool_cuda_kernel.cu']),
     ],
-    cmdclass={'build_ext': BuildExtension})
+    cmdclass={'build_ext': BuildExtension.with_options(use_ninja=False)})
