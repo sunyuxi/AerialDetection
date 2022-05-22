@@ -204,6 +204,12 @@ class AnchorHead(nn.Module):
             for i in range(num_levels)
         ]
         result_list = []
+        print(('sunyuxi3_img_metas', img_metas))
+        for one in cls_scores:
+            print(('sunyuxi3_cls_scores', one.shape))
+        for one in bbox_preds:
+            print(('sunyuxi3_bbox_preds', one.shape))
+
         for img_id in range(len(img_metas)):
             cls_score_list = [
                 cls_scores[i][img_id].detach() for i in range(num_levels)
@@ -267,4 +273,5 @@ class AnchorHead(nn.Module):
         det_bboxes, det_labels = multiclass_nms(mlvl_bboxes, mlvl_scores,
                                                 cfg.score_thr, cfg.nms,
                                                 cfg.max_per_img)
+        print(('sunyuxi4_multiclass_nms(incorrect running)'))
         return det_bboxes, det_labels

@@ -2,6 +2,9 @@ from __future__ import division
 
 import torch
 import torch.nn as nn
+import os
+import h5py
+import numpy as np
 
 from .base_new import BaseDetectorNew
 from .test_mixins import RPNTestMixin
@@ -114,8 +117,13 @@ class RoITransformer(BaseDetectorNew, RPNTestMixin):
 
     def extract_feat(self, img):
         x = self.backbone(img)
+        for one in x:
+            print(('sunyuxi1_backbone', one.shape))
+
         if self.with_neck:
             x = self.neck(x)
+            for one in x:
+                print(('sunyuxi1_neck', one.shape))
         return x
 
     def forward_train(self,
@@ -245,8 +253,68 @@ class RoITransformer(BaseDetectorNew, RPNTestMixin):
 
         return losses
 
-    def simple_test(self, img, img_meta, proposals=None, rescale=False):
+    def saveROIFeats(self, suffix, output_dir, det_ids, roi_feats):
+        roi_feats = copy.deepcopy(roi_feats).cpu().data.numpy()
+        num, c, w, h = roi_feats.shape
+        assert num == len(det_ids)
+        for idx, det_id in enumerate(det_ids):
+            filepath = os.path.join(output_dir, str(det_id)+"_"+suffix+".hdf5")
+            if os.path.exists(filepath):
+                print('Error: file exists!\t' + filepath)
+                assert False
+            
+            f = h5py.File(filepath, "w")
+            h5_hbb = f.create_dataset('roi_feats', (1, c, w, h), dtype=roi_feats.dtype)
+            h5_hbb[0] = roi_feats[idx]
+            f.close()
+
+    def xywh2xyxy(self, x):  # Convert bounding box format from [x, y, w, h] to [x1, y1, x2, y2]
+        x = np.array(x, dtype=np.float32).reshape(-1, 4)
+        y = np.zeros_like(x)
+        y[:, 0] = (x[:, 0] - x[:, 2] / 2)
+        y[:, 1] = (x[:, 1] - x[:, 3] / 2)
+        y[:, 2] = (x[:, 0] + x[:, 2] / 2)
+        y[:, 3] = (x[:, 1] + x[:, 3] / 2)
+        return y
+
+    def simple_test_saveROIFeats(self, img, img_meta, proposals=None, rescale=False, info_bboxes=None):
+        print(img.shape)
         x = self.extract_feat(img)
+
+        bboxes = self.xywh2xyxy(info_bboxes[4])
+        bboxes = torch.from_numpy(bboxes).float().cuda()
+        img_inds = bboxes.new_full((bboxes.size(0), 1), 0)
+        rois = torch.cat([img_inds, bboxes[:, :4]], dim=-1)
+        #list:2000,5 : proposal_count, x1y1 x2y2 score
+        #print(rois)
+        #rois:img_id, x1,y1,x2,y2
+        #original x1y1x2y2
+        #the rois is scaled by spatial_scale in RoIAlign 
+        bbox_feats = self.bbox_roi_extractor(
+            x[:len(self.bbox_roi_extractor.featmap_strides)], rois)
+        #print(('roi_bbox sum', bbox_feats.sum(-1).sum(-1).sum(-1)))
+        self.saveROIFeats('hbb_'+info_bboxes[0], info_bboxes[1], info_bboxes[2], bbox_feats)
+        
+        rbboxes = np.array(info_bboxes[3], dtype=np.float32).reshape(-1, 5)
+        rbboxes = torch.from_numpy(rbboxes).float().cuda()
+        img_inds = rbboxes.new_full((rbboxes.size(0), 1), 0)
+        rrois_enlarge = torch.cat([img_inds, rbboxes[:, :5]], dim=-1)
+        # tricks?
+        rrois_enlarge[:, 3] = rrois_enlarge[:, 3] * self.rbbox_roi_extractor.w_enlarge
+        rrois_enlarge[:, 4] = rrois_enlarge[:, 4] * self.rbbox_roi_extractor.h_enlarge
+        print(('sunyuxi_rrois_enlarge', rrois_enlarge.shape, self.rbbox_roi_extractor.w_enlarge, self.rbbox_roi_extractor.h_enlarge))
+        #print(('sunyuxi_angle', rrois_enlarge[:, -1]*180/3.1415926))
+        rbbox_feats = self.rbbox_roi_extractor(
+            x[:len(self.rbbox_roi_extractor.featmap_strides)], rrois_enlarge)
+        #print(('rroi_bbox sum', rbbox_feats.sum(-1).sum(-1).sum(-1)))
+        self.saveROIFeats('obb_'+info_bboxes[0], info_bboxes[1], info_bboxes[2], rbbox_feats)
+        
+        return True
+
+    def simple_test_nosaveROIFeats(self, img, img_meta, proposals=None, rescale=False, info_bboxes=None):
+        print(img.shape)
+        x = self.extract_feat(img)
+        #list:2000,5 : proposal_count, x1y1 x2y2 score
         proposal_list = self.simple_test_rpn(
             x, img_meta, self.test_cfg.rpn) if proposals is None else proposals
 
@@ -255,39 +323,92 @@ class RoITransformer(BaseDetectorNew, RPNTestMixin):
 
         rcnn_test_cfg = self.test_cfg.rcnn
 
+        # add imgid
         rois = bbox2roi(proposal_list)
+        for one in proposal_list:
+            print(('sunyuxi6_proposal_list', one.shape, one))
+        print(('sunyuxi6_rois', rois.shape))
+        #print(rois)
+        #rois:img_id, x1,y1,x2,y2
+        #original x1y1x2y2
+        #the rois is scaled by spatial_scale in RoIAlign 
         bbox_feats = self.bbox_roi_extractor(
             x[:len(self.bbox_roi_extractor.featmap_strides)], rois)
+        print(('sunyuxi7_bbox_feats', type(bbox_feats), bbox_feats.shape), flush=True)
+        #False
         if self.with_shared_head:
             bbox_feats = self.shared_head(bbox_feats)
-
+            print( ('sunyuxi8_with_shared_head', x.shape, type(bbox_feats), bbox_feats.shape), flush=True)
+        # bbox_feats is reshaped into (2000, -1), fc is applied to convert bbox_feats into (2000, 1024)
+        # finally, fc is applied to convert bbox_feats into (2000, 16) [class] and (2000, 5) [bbox]
         cls_score, bbox_pred = self.bbox_head(bbox_feats)
 
         bbox_label = cls_score.argmax(dim=1)
+        #roi2droid: convert id, x0y0x1y1 to id, xywh_\theta(default)
+        #bbox_label is useless
+        #rois * bbox_pred, \theta is updated
+        #rrois: the same shape as input rois, i.e., id, xywh_\theta(updated)
         rrois = self.bbox_head.regress_by_class_rbbox(roi2droi(rois), bbox_label, bbox_pred,
                                                       img_meta[0])
-
+        print(('sunyuxi9_rrois:', rrois.shape, rrois[:, 0]))
+        #for one in rrois:
+        #    one=one[1:]
+        #    assert one[2]>one[3]
+        #    print(('sunyuxi_rrois', one[2]>one[3], one[4], one))
+        #rrois:imgid,x,y,w,h,\theta
         rrois_enlarge = copy.deepcopy(rrois)
+        # tricks?
         rrois_enlarge[:, 3] = rrois_enlarge[:, 3] * self.rbbox_roi_extractor.w_enlarge
         rrois_enlarge[:, 4] = rrois_enlarge[:, 4] * self.rbbox_roi_extractor.h_enlarge
+        print(('sunyuxi_rrois_enlarge', rrois_enlarge.shape, self.rbbox_roi_extractor.w_enlarge, self.rbbox_roi_extractor.h_enlarge))
+        print(('sunyuxi_angle', rrois_enlarge[:, -1]*180/3.1415926))
         rbbox_feats = self.rbbox_roi_extractor(
             x[:len(self.rbbox_roi_extractor.featmap_strides)], rrois_enlarge)
+        #False
         if self.with_shared_head_rbbox:
             rbbox_feats = self.shared_head_rbbox(rbbox_feats)
+            print(('sunyuxi10_rbbox_feats', rbbox_feats.shape))
 
+        print(('sunyuxi11_rbbox_feats', rbbox_feats.shape))
         rcls_score, rbbox_pred = self.rbbox_head(rbbox_feats)
-        det_rbboxes, det_labels = self.rbbox_head.get_det_rbboxes(
-            rrois,
-            rcls_score,
-            rbbox_pred,
-            img_shape,
-            scale_factor,
-            rescale=rescale,
-            cfg=rcnn_test_cfg)
+        print(('sunyuxi12_rcls_score, rbbox_pred', rcls_score.shape, rbbox_pred.shape))
+        #det_rbboxes, det_labels, det_bbox_inds = self.rbbox_head.get_det_rbboxes(
+        #    rrois,
+        #    rcls_score,
+        #    rbbox_pred,
+        #    img_shape,
+        #    scale_factor,
+        #    rescale=rescale,
+        #    cfg=rcnn_test_cfg)
+
+        ori_score_thr = rcnn_test_cfg.score_thr
+        for step in range(0, 450):
+            rcnn_test_cfg.score_thr = ori_score_thr - step*0.0001
+            det_rbboxes, det_labels, det_bbox_inds = self.rbbox_head.get_det_rbboxes(
+                rrois,
+                rcls_score,
+                rbbox_pred,
+                img_shape,
+                scale_factor,
+                rescale=rescale,
+                cfg=rcnn_test_cfg)
+            if det_rbboxes.shape[0] > 0:
+                break
+        rcnn_test_cfg.score_thr = ori_score_thr
+        assert det_rbboxes.shape[0] > 0
+
+        print(('sunyuxi13_detrbboxes, det_labels', det_rbboxes.shape, det_labels.shape, det_bbox_inds.shape)) # , det_rbboxes, det_labels
         rbbox_results = dbbox2result(det_rbboxes, det_labels,
                                      self.rbbox_head.num_classes)
+        print(('sunyuxi14_rbbox_results', len(rbbox_results))) # rbbox_results
 
         return rbbox_results
+
+    def simple_test(self, img, img_meta, proposals=None, rescale=False, info_bboxes=None):
+        if info_bboxes is None:
+            return self.simple_test_nosaveROIFeats(img, img_meta, proposals, rescale, info_bboxes)
+        else:
+            return self.simple_test_saveROIFeats(img, img_meta, proposals, rescale, info_bboxes)
 
     def aug_test(self, imgs, img_metas, proposals=None, rescale=None):
         # raise NotImplementedError

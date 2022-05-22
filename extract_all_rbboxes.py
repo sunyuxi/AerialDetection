@@ -1,3 +1,5 @@
+# -*- coding:utf8 -*-
+
 from mmdet.apis import init_detector, inference_detector, show_result, draw_poly_detections
 import mmcv
 from mmcv import Config
@@ -5,10 +7,10 @@ from mmdet.datasets import get_dataset
 import cv2
 import os
 import numpy as np
-from tqdm import tqdm
 import DOTA_devkit.polyiou as polyiou
 import math
-import pdb
+import random
+import torch
 
 def py_cpu_nms_poly_fast_np(dets, thresh):
     obbs = dets[:, 0:-1]
@@ -87,14 +89,24 @@ class DetectorModel():
         return detections
 
 if __name__ == '__main__':
+    assert False # 防止误执行
+
+    seed = 13
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed+2)
+    torch.cuda.manual_seed_all(seed+3)
+
     roitransformer = DetectorModel(r'configs/DOTA/faster_rcnn_RoITrans_r50_fpn_1x_dota.py',
                   r'work_dirs/faster_rcnn_RoITrans_r50_fpn_1x_dota/epoch_12.pth')
     
-    '''input_dir = 'data/RSVG/images'
-    det_results_path='data/RSVG/det_hbb_obb.txt'
+    input_dir = 'data/RSVG/images'
+    det_results_path='data/RSVG/det_obb_rsvg.txt'
     output_dir = 'demo/RSVG'
     f=open(det_results_path, 'w')
+    #for filename in open('diff_all_img.txt'):
     for filename in os.listdir(input_dir):
+        filename = filename.strip()
         print(filename)
         in_path = os.path.join(input_dir, filename)
         detections = roitransformer.inference_single_vis(in_path, os.path.join(output_dir, filename), (1024, 1024))
@@ -105,14 +117,4 @@ if __name__ == '__main__':
                 continue
             for det in dets:
                 f.write(filename + ' ' + ' '.join([str(one) for one in det]) + ' ' + name + "\n")
-    f.close()'''
-
-    
-
-    detections = roitransformer.inference_single_vis(r'demo/792397_3780390_1024_32616_junction_roundabout.jpg',
-                                       r'demo/792397_3780390_1024_32616_junction_roundabout_out.jpg',
-                                       (1024, 1024))
-    print(len(detections))
-    print(detections[0].shape)
-    print(roitransformer.classnames)
-
+    f.close()

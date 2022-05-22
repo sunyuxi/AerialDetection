@@ -69,50 +69,56 @@ class DetectorModel():
         self.classnames = self.dataset.CLASSES
         self.model = init_detector(config_file, checkpoint_file, device='cuda:0')
 
-    def inference_single(self, imagname, img_size):
+    def inference_single(self, imagname, slide_size, chip_size):
         img = mmcv.imread(imagname)
         height, width, channel = img.shape
-        assert height==img_size[0] and width==img_size[1]
+        slide_h, slide_w = slide_size
+        hn, wn = chip_size
         # TODO: check the corner case
         # import pdb; pdb.set_trace()
         total_detections = [np.zeros((0, 9)) for _ in range(len(self.classnames))]
-        total_detections = inference_detector(self.model, img)
-        
-        return total_detections
 
-    def inference_single_vis(self, srcpath, dstpath, img_size):
-        detections = self.inference_single(srcpath, img_size)
-        img = draw_poly_detections(srcpath, detections.copy(), self.classnames, scale=1, threshold=0.3)
+        #for i in tqdm(range(int(width / slide_w + 1))):
+        #    for j in range(int(height / slide_h) + 1):
+        for i in tqdm(range(int(width / slide_w))):
+            for j in range(int(height / slide_h)):
+                subimg = np.zeros((hn, wn, channel))
+                # print('i: ', i, 'j: ', j)
+                chip = img[j*slide_h:j*slide_h + hn, i*slide_w:i*slide_w + wn, :3]
+                subimg[:chip.shape[0], :chip.shape[1], :] = chip
+
+                chip_detections = inference_detector(self.model, (subimg, imagname))
+                for cls_id, name in enumerate(self.classnames):
+                    chip_detections[cls_id][:, :8][:, ::2] = chip_detections[cls_id][:, :8][:, ::2] + i * slide_w
+                    chip_detections[cls_id][:, :8][:, 1::2] = chip_detections[cls_id][:, :8][:, 1::2] + j * slide_h
+                    # import pdb;pdb.set_trace()
+                    try:
+                        total_detections[cls_id] = np.concatenate((total_detections[cls_id], chip_detections[cls_id]))
+                    except:
+                        import pdb; pdb.set_trace()
+        # nms
+        for i in range(len(self.classnames)):
+            keep = py_cpu_nms_poly_fast_np(total_detections[i], 0.1)
+            total_detections[i] = total_detections[i][keep]
+        return total_detections
+    def inference_single_vis(self, srcpath, dstpath, slide_size, chip_size):
+        detections = self.inference_single(srcpath, slide_size, chip_size)
+        img = draw_poly_detections(srcpath, detections, self.classnames, scale=1, threshold=0.3)
         cv2.imwrite(dstpath, img)
-        return detections
 
 if __name__ == '__main__':
     roitransformer = DetectorModel(r'configs/DOTA/faster_rcnn_RoITrans_r50_fpn_1x_dota.py',
                   r'work_dirs/faster_rcnn_RoITrans_r50_fpn_1x_dota/epoch_12.pth')
     
     '''input_dir = 'data/RSVG/images'
-    det_results_path='data/RSVG/det_hbb_obb.txt'
-    output_dir = 'demo/RSVG'
-    f=open(det_results_path, 'w')
     for filename in os.listdir(input_dir):
         print(filename)
         in_path = os.path.join(input_dir, filename)
-        detections = roitransformer.inference_single_vis(in_path, os.path.join(output_dir, filename), (1024, 1024))
-        class_names = roitransformer.classnames
-        for j, name in enumerate(class_names):
-            dets = detections[j]
-            if dets.shape[0] == 0:
-                continue
-            for det in dets:
-                f.write(filename + ' ' + ' '.join([str(one) for one in det]) + ' ' + name + "\n")
-    f.close()'''
+        roitransformer.inference_single_vis(in_path, os.path.join('demo/RSVG', filename),
+                        (1024, 1024), (1024, 1024))'''
 
-    
-
-    detections = roitransformer.inference_single_vis(r'demo/792397_3780390_1024_32616_junction_roundabout.jpg',
+    roitransformer.inference_single_vis(r'demo/792397_3780390_1024_32616_junction_roundabout.jpg',
                                        r'demo/792397_3780390_1024_32616_junction_roundabout_out.jpg',
+                                        (1024, 1024),
                                        (1024, 1024))
-    print(len(detections))
-    print(detections[0].shape)
-    print(roitransformer.classnames)
 

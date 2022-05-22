@@ -246,16 +246,18 @@ class BBoxHeadRbbox(nn.Module):
             cls_score = sum(cls_score) / float(len(cls_score))
         scores = F.softmax(cls_score, dim=1) if cls_score is not None else None
 
+        #True
         if rbbox_pred is not None:
             # bboxes = delta2dbbox(rois[:, 1:], bbox_pred, self.target_means,
             #                     self.target_stds, img_shape)
+            #order is not changed
             dbboxes = delta2dbbox_v2(rrois[:, 1:], rbbox_pred, self.target_means,
                                      self.target_stds, img_shape)
         else:
             # bboxes = rois[:, 1:]
             dbboxes = rrois[:, 1:]
             # TODO: add clip here
-
+        #True
         if rescale:
             # bboxes /= scale_factor
             # dbboxes[:, :4] /= scale_factor
@@ -267,13 +269,13 @@ class BBoxHeadRbbox(nn.Module):
             return dbboxes, scores
         else:
             c_device = dbboxes.device
-
-            det_bboxes, det_labels = multiclass_nms_rbbox(dbboxes, scores,
+            print(('sunyuxi12_0_get_det_rbboxes', dbboxes.shape, scores.shape))
+            det_bboxes, det_labels, det_bbox_inds = multiclass_nms_rbbox(dbboxes, scores,
                                                     cfg.score_thr, cfg.nms,
                                                     cfg.max_per_img)
             # det_bboxes = torch.from_numpy(det_bboxes).to(c_device)
             # det_labels = torch.from_numpy(det_labels).to(c_device)
-            return det_bboxes, det_labels
+            return det_bboxes, det_labels, det_bbox_inds
 
     def refine_rbboxes(self, rois, labels, bbox_preds, pos_is_gts, img_metas):
         """Refine bboxes during training.
@@ -330,13 +332,13 @@ class BBoxHeadRbbox(nn.Module):
         # import pdb
         # pdb.set_trace()
         assert rois.size(1) == 5 or rois.size(1) == 6
-
+        #False
         if not self.reg_class_agnostic:
             label = label * 5
             inds = torch.stack((label, label + 1, label + 2, label + 3, label + 4), 1)
             bbox_pred = torch.gather(bbox_pred, 1, inds)
         assert bbox_pred.size(1) == 5
-
+        #False
         if rois.size(1) == 5:
             if self.with_module:
                 new_rois = delta2dbbox(rois, bbox_pred, self.target_means,
@@ -347,12 +349,16 @@ class BBoxHeadRbbox(nn.Module):
             # choose best Rroi
             new_rois = choose_best_Rroi_batch(new_rois)
         else:
+            #False
             if self.with_module:
                 bboxes = delta2dbbox(rois[:, 1:], bbox_pred, self.target_means,
                                     self.target_stds, img_meta['img_shape'])
-            else:
+            else: # #True for rroi
+                #bbox is transformed. and the transformation is reversible
                 bboxes = delta2dbbox_v3(rois[:, 1:], bbox_pred, self.target_means,
                                     self.target_stds, img_meta['img_shape'])
+            #change the width and height if width<height
+            #the order of bboxes is not changed
             bboxes = choose_best_Rroi_batch(bboxes)
             new_rois = torch.cat((rois[:, [0]], bboxes), dim=1)
 

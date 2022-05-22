@@ -138,40 +138,56 @@ class ConvFCBBoxHeadRbbox(BBoxHeadRbbox):
 
     def forward(self, x):
         # shared part
+        # False
         if self.num_shared_convs > 0:
             for conv in self.shared_convs:
                 x = conv(x)
-
+        # True
         if self.num_shared_fcs > 0:
+            # False
             if self.with_avg_pool:
                 x = self.avg_pool(x)
+            print(('sunyuxi_bbox_head_before0', x.shape))
             x = x.view(x.size(0), -1)
+            print(('sunyuxi_bbox_head_before1', x.shape))
             for fc in self.shared_fcs:
                 x = self.relu(fc(x))
+                print(('sunyuxi_bbox_head_after', x.shape))
         # separate branches
         x_cls = x
         x_reg = x
-
+        # empty
         for conv in self.cls_convs:
             x_cls = conv(x_cls)
+            print(('sunyuxi cls_convs', type(conv), x_cls.shape))
+
+        # False
         if x_cls.dim() > 2:
             if self.with_avg_pool:
                 x_cls = self.avg_pool(x_cls)
             x_cls = x_cls.view(x_cls.size(0), -1)
+        # empty
         for fc in self.cls_fcs:
             x_cls = self.relu(fc(x_cls))
-
+            print(('sunyuxi cls_convs', type(fc), x_cls.shape))
+        # empty
         for conv in self.reg_convs:
             x_reg = conv(x_reg)
+            print(('sunyuxi reg_convs', type(conv), x_reg.shape))
+
+        # False
         if x_reg.dim() > 2:
             if self.with_avg_pool:
                 x_reg = self.avg_pool(x_reg)
             x_reg = x_reg.view(x_reg.size(0), -1)
+        # empty
         for fc in self.reg_fcs:
             x_reg = self.relu(fc(x_reg))
+            print(('sunyuxi reg_fcs', type(fc), x_reg.shape))
 
         cls_score = self.fc_cls(x_cls) if self.with_cls else None
         bbox_pred = self.fc_reg(x_reg) if self.with_reg else None
+        print(('sunyuxi11_0_ConvFCBBoxHeadRbbox', cls_score.shape, bbox_pred.shape))
         return cls_score, bbox_pred
 
 

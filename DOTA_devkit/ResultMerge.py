@@ -10,7 +10,7 @@ import dota_utils as util
 import re
 import time
 import polyiou
-from poly_nms_gpu.nms_wrapper import poly_nms_gpu
+#from poly_nms_gpu.nms_wrapper import poly_nms_gpu
 import pdb
 
 ## the thresh for nms when merge image
@@ -192,15 +192,22 @@ def mergebypoly(srcpath, dstpath):
     #           poly_nms_gpu)
 if __name__ == '__main__':
 
-    start = time.clock()
+    #start = time.clock()
     # mergebypoly(r'/home/dingjian/data/ODAI/ODAI_submmit/baseline/task1_results',
     #             r'/home/dingjian/data/ODAI/ODAI_submmit/baseline/task1_merge2')
     # mergebypoly(r'/home/dingjian/Documents/Research/experiments/rotateanchorrotateregion/40_angle_agnostic',
     #             r'/home/dingjian/Documents/Research/experiments/rotateanchorrotateregion/40_angle_agnostic_0.1_nms')
-    mergebypoly(r'/home/dingjian/Documents/Research/experiments/Deform_FPN_Naive_poly/Task1_results_epoch12',
-                r'/home/dingjian/Documents/Research/experiments/Deform_FPN_Naive_poly/Task_results_epoch12_0.1_nms')
+    #mergebypoly(r'/home/dingjian/Documents/Research/experiments/Deform_FPN_Naive_poly/Task1_results_epoch12',
+    #            r'/home/dingjian/Documents/Research/experiments/Deform_FPN_Naive_poly/Task_results_epoch12_0.1_nms')
     # mergebyrec(r'/home/dingjian/Documents/Research/experiments/Deform_FPN_HBB/Task2_results',
     #            r'/home/dingjian/Documents/Research/experiments/Deform_FPN_HBB/Task2_results_0.3_nms')
-    elapsed = (time.clock() - start)
-    print("Time used:", elapsed)
+    
+    old_dir=r'/mnt/A/sunyuxi/objectdetection/AerialDetection/work_dirs/faster_rcnn_RoITrans_r50_fpn_1x_dota/Task1_results'
+    new_dir=r'/mnt/A/sunyuxi/objectdetection/AerialDetection/work_dirs/faster_rcnn_RoITrans_r50_fpn_1x_dota/Task1_results_merge'
+    if not os.path.exists(new_dir):
+        os.makedirs(new_dir)
+    mergebypoly(old_dir, new_dir)
+
+    #elapsed = (time.clock() - start)
+    #print("Time used:", elapsed)
     # test_nms()

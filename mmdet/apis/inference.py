@@ -86,11 +86,17 @@ def _prepare_data(img, img_transform, cfg, device):
     return dict(img=[img], img_meta=[img_meta])
 
 
-def _inference_single(model, img, img_transform, device):
+def _inference_single(model, img_with_infobboxes, img_transform, device):
+    if isinstance(img_with_infobboxes, tuple):
+        img, info_bboxes = img_with_infobboxes[0], img_with_infobboxes[1]
+        print(('sunyuxi0', img.shape, len(info_bboxes)))
+    else:
+        img, info_bboxes = img_with_infobboxes, None
     img = mmcv.imread(img)
     data = _prepare_data(img, img_transform, model.cfg, device)
+    
     with torch.no_grad():
-        result = model(return_loss=False, rescale=True, **data)
+        result = model(return_loss=False, rescale=True, info_bboxes=info_bboxes, **data)
     return result
 
 

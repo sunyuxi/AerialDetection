@@ -28,6 +28,7 @@ class RoIAlignFunction(Function):
 
         output = features.new_zeros(num_rois, num_channels, out_h, out_w)
         if features.is_cuda:
+            print(('sunyuxi_ROIAlign', 1/spatial_scale, features.shape, 1024/features.shape[2]))
             roi_align_cuda.forward(features, rois, out_h, out_w, spatial_scale,
                                    sample_num, output)
         else:

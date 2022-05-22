@@ -77,10 +77,12 @@ class RboxSingleRoIExtractor(nn.Module):
             return self.roi_layers[0](feats[0], rois)
 
         out_size = self.roi_layers[0].out_size
+        print(('test', out_size, feats[1].shape))
         # import pdb
         # pdb.set_trace()
         num_levels = len(feats)
         target_lvls = self.map_roi_levels(rois, num_levels)
+        #True
         if isinstance(out_size, int):
             roi_feats = torch.cuda.FloatTensor(rois.size()[0], self.out_channels,
                                                out_size, out_size).fill_(0)

@@ -32,6 +32,7 @@ class RPNHead(AnchorHead):
         x = F.relu(x, inplace=True)
         rpn_cls_score = self.rpn_cls(x)
         rpn_bbox_pred = self.rpn_reg(x)
+        print(('sunyuxi2_rpn_head', rpn_cls_score.shape, rpn_bbox_pred.shape))
         return rpn_cls_score, rpn_bbox_pred
 
     def loss(self,
@@ -62,6 +63,7 @@ class RPNHead(AnchorHead):
                           rescale=False):
         mlvl_proposals = []
         for idx in range(len(cls_scores)):
+            print(('sunyuxi4_getbboxes_single_cls_scores:', cls_scores[idx].shape))
             rpn_cls_score = cls_scores[idx]
             rpn_bbox_pred = bbox_preds[idx]
             assert rpn_cls_score.size()[-2:] == rpn_bbox_pred.size()[-2:]
@@ -91,6 +93,7 @@ class RPNHead(AnchorHead):
             proposals = torch.cat([proposals, scores.unsqueeze(-1)], dim=-1)
             proposals, _ = nms(proposals, cfg.nms_thr)
             proposals = proposals[:cfg.nms_post, :]
+            print(('sunyuxi4_proposals.shape:', proposals.shape))
             mlvl_proposals.append(proposals)
         proposals = torch.cat(mlvl_proposals, 0)
         if cfg.nms_across_levels:
@@ -101,4 +104,5 @@ class RPNHead(AnchorHead):
             num = min(cfg.max_num, proposals.shape[0])
             _, topk_inds = scores.topk(num)
             proposals = proposals[topk_inds, :]
+        
         return proposals

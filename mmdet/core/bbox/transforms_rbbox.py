@@ -184,7 +184,6 @@ def delta2dbbox_v3(Rrois,
     # gangle = (2 * np.pi) * dangle + Rroi_angle
     gangle = dangle + Rroi_angle
     # gangle = gangle % ( 2 * np.pi)
-
     if max_shape is not None:
         pass
 
@@ -585,7 +584,6 @@ def gt_mask_bp_obbs(gt_masks, with_module=True):
     gt_polys = mask2poly(gt_masks)
     gt_bp_polys = get_best_begin_point(gt_polys)
     gt_obbs = polygonToRotRectangle_batch(gt_bp_polys, with_module)
-
     return gt_obbs
 
 def gt_mask_bp_obbs_list(gt_masks_list):
@@ -637,7 +635,6 @@ def get_best_begin_point(coordinate_list):
     # import pdb
     # pdb.set_trace()
     best_coordinate_list = np.stack(list(best_coordinate_list))
-
     return best_coordinate_list
 
 # def polygonToRotRectangle(polys):
@@ -759,7 +756,7 @@ def roi2droi(rois):
 
     return torch.cat((rois[:, 0].unsqueeze(1), obbs), 1)
 
-def polygonToRotRectangle_batch(bbox, with_module=True):
+def polygonToRotRectangle_batch(bbox_ori, with_module=True):
     """
     :param bbox: The polygon stored in format [x1, y1, x2, y2, x3, y3, x4, y4]
             shape [num_boxes, 8]
@@ -767,11 +764,13 @@ def polygonToRotRectangle_batch(bbox, with_module=True):
             shape [num_rot_recs, 5]
     """
     # print('bbox: ', bbox)
-    bbox = np.array(bbox,dtype=np.float32)
-    bbox = np.reshape(bbox,newshape=(-1, 2, 4),order='F')
+    bbox_ori = np.array(bbox_ori,dtype=np.float32)
+    
+    bbox = np.reshape(bbox_ori,newshape=(-1, 2, 4),order='F')
     # angle = math.atan2(-(bbox[0,1]-bbox[0,0]),bbox[1,1]-bbox[1,0])
     # print('bbox: ', bbox)
     angle = np.arctan2(-(bbox[:, 0,1]-bbox[:, 0,0]),bbox[:, 1,1]-bbox[:, 1,0])
+    
     # angle = np.arctan2(-(bbox[:, 0,1]-bbox[:, 0,0]),bbox[:, 1,1]-bbox[:, 1,0])
     # center = [[0],[0]] ## shape [2, 1]
     # print('angle: ', angle)
@@ -786,8 +785,6 @@ def polygonToRotRectangle_batch(bbox, with_module=True):
     R = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]], dtype=np.float32)
 
     normalized = np.matmul(R.transpose((2, 1, 0)),bbox-center)
-
-
     xmin = np.min(normalized[:, 0, :], axis=1)
     # print('diff: ', (xmin - normalized[:, 0, 3]))
     # assert sum((abs(xmin - normalized[:, 0, 3])) > eps) == 0
@@ -849,6 +846,11 @@ def RotBox2Polys(dboxes):
     y4 = y4[:, np.newaxis]
 
     polys = np.concatenate((x1, y1, x2, y2, x3, y3, x4, y4), axis=1)
+    
+    #sunyuxi
+    #for idx in range(polys.shape[0]):
+    #    print(('sunyuxi_angle_bbox', (x_ctr[idx], y_ctr[idx], w[idx], h[idx], dboxes[idx, 4]*180/np.pi), polys[idx]))
+
     return polys
 
 def RotBox2Polys_torch(dboxes):

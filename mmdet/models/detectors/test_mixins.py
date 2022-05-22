@@ -10,6 +10,7 @@ class RPNTestMixin(object):
         rpn_outs = self.rpn_head(x)
         proposal_inputs = rpn_outs + (img_meta, rpn_test_cfg)
         proposal_list = self.rpn_head.get_bboxes(*proposal_inputs)
+        print(('sunyuxi5_simple_test_rpn,proposal_list', proposal_list[0].shape, len(proposal_list)))
         return proposal_list
 
     def aug_test_rpn(self, feats, img_metas, rpn_test_cfg):

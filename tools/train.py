@@ -73,6 +73,16 @@ def main():
         cfg.model, train_cfg=cfg.train_cfg, test_cfg=cfg.test_cfg)
 
     train_dataset = get_dataset(cfg.data.train)
+
+    from mmdet.core.bbox import gt_mask_bp_obbs
+    for one in train_dataset:
+        print(one.keys())
+        gt_mask_bp_obbs(one['gt_masks'].data)
+        #print(one['gt_bboxes'].data)
+        #print(one['gt_labels'].data.shape)
+        #print(one['gt_masks'].data.sum())
+    print('sunyuxi1111111111111111111')
+    return 
     if cfg.checkpoint_config is not None:
         # save mmdet version, config file content and class names in
         # checkpoints as meta data

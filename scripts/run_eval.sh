@@ -1,0 +1,1 @@
+python DOTA_devkit/dota_evaluation_task1.py

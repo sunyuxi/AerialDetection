@@ -24,7 +24,7 @@ def multiclass_nms_rbbox(multi_bboxes,
     :return:
     """
     num_classes = multi_scores.shape[1]
-    bboxes, labels = [], []
+    bboxes, labels, ret_bbox_inds = [], [], []
     nms_cfg_ = nms_cfg.copy()
     # nms_type = nms_cfg_.pop('type', 'nms')
     # nms_op = py_cpu_nms_poly_fast
@@ -35,6 +35,9 @@ def multiclass_nms_rbbox(multi_bboxes,
         nms_op = getattr(poly_nms_wrapper, nms_type)
     else:
         nms_op = getattr(rnms_wrapper, nms_type)
+    #sunyuxi
+    bbox_inds_list = [ i_tmp for i_tmp in range( multi_bboxes.shape[0] ) ]
+    bbox_inds_t = torch.tensor(bbox_inds_list).to(multi_bboxes.device).long()
     for i in range(1, num_classes):
         cls_inds = multi_scores[:, i] > score_thr
         if not cls_inds.any():
@@ -52,9 +55,14 @@ def multiclass_nms_rbbox(multi_bboxes,
             _scores *= score_factors[cls_inds]
         cls_dets = torch.cat([_bboxes, _scores[:, None]], dim=1)
         # TODO: figure out the nms_cfg
+        #sunyuxi
+        cls_bbox_inds = multi_bboxes.new_zeros((0, ), dtype=torch.long)
         if not DEBUG:
             # start = time.clock()
-            cls_dets, _ = nms_op(cls_dets, **nms_cfg_)
+            #cls_dets, _ = nms_op(cls_dets, **nms_cfg_)
+            cls_dets, keep_tmp = nms_op(cls_dets, **nms_cfg_)
+            #sunyuxi
+            cls_bbox_inds = bbox_inds_t[cls_inds][keep_tmp]
             # elapsed = (time.clock() - start)
             # print("Time used:", elapsed)
         # import pdb
@@ -63,20 +71,25 @@ def multiclass_nms_rbbox(multi_bboxes,
             (cls_dets.shape[0], ), i - 1, dtype=torch.long)
         bboxes.append(cls_dets)
         labels.append(cls_labels)
+        ret_bbox_inds.append(cls_bbox_inds)
     if bboxes:
         bboxes = torch.cat(bboxes)
         labels = torch.cat(labels)
+        #sunyuxi
+        ret_bbox_inds = torch.cat(ret_bbox_inds)
         if bboxes.shape[0] > max_num:
             _, inds = bboxes[:, -1].sort(descending=True)
             inds = inds[:max_num]
             bboxes = bboxes[inds]
             labels = labels[inds]
+            ret_bbox_inds = ret_bbox_inds[inds]
 
     else:
         bboxes = multi_bboxes.new_zeros((0, 9))
         labels = multi_bboxes.new_zeros((0, ), dtype=torch.long)
+        ret_bbox_inds = multi_bboxes.new_zeros((0, ), dtype=torch.long)
 
-    return bboxes, labels
+    return bboxes, labels, ret_bbox_inds
 
 def Pesudomulticlass_nms_rbbox(multi_bboxes,
                          multi_scores,

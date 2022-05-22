@@ -65,7 +65,9 @@ def prepare(srcpath, dstpath):
     """
     if not os.path.exists(os.path.join(dstpath, 'test1024')):
         os.mkdir(os.path.join(dstpath, 'test1024'))
-    if not os.path.exists(os.path.join(dstpath, 'trainval1024')):
+    if not os.path.exists(os.path.join(dstpath, 'val1024')):
+        os.mkdir(os.path.join(dstpath, 'val1024'))
+    '''if not os.path.exists(os.path.join(dstpath, 'trainval1024')):
         os.mkdir(os.path.join(dstpath, 'trainval1024'))
 
     split_train = ImgSplit_multi_process.splitbase(os.path.join(srcpath, 'train'),
@@ -74,26 +76,26 @@ def prepare(srcpath, dstpath):
                       subsize=1024,
                       num_process=32
                       )
-    split_train.splitdata(1)
+    split_train.splitdata(1)'''
 
     split_val = ImgSplit_multi_process.splitbase(os.path.join(srcpath, 'val'),
-                       os.path.join(dstpath, 'trainval1024'),
+                       os.path.join(dstpath, 'val1024'),
                       gap=200,
                       subsize=1024,
                       num_process=32
                       )
     split_val.splitdata(1)
 
-    split_test = SplitOnlyImage_multi_process.splitbase(os.path.join(srcpath, 'test', 'images'),
+    '''split_test = SplitOnlyImage_multi_process.splitbase(os.path.join(srcpath, 'test', 'images'),
                        os.path.join(dstpath, 'test1024', 'images'),
                       gap=200,
                       subsize=1024,
                       num_process=32
                       )
-    split_test.splitdata(1)
+    split_test.splitdata(1)'''
 
-    DOTA2COCOTrain(os.path.join(dstpath, 'trainval1024'), os.path.join(dstpath, 'trainval1024', 'DOTA_trainval1024.json'), wordname_15, difficult='-1')
-    DOTA2COCOTest(os.path.join(dstpath, 'test1024'), os.path.join(dstpath, 'test1024', 'DOTA_test1024.json'), wordname_15)
+    DOTA2COCOTrain(os.path.join(dstpath, 'val1024'), os.path.join(dstpath, 'val1024', 'DOTA_val1024.json'), wordname_15, difficult='-1')
+    #DOTA2COCOTest(os.path.join(dstpath, 'test1024'), os.path.join(dstpath, 'test1024', 'DOTA_test1024.json'), wordname_15)
 
 if __name__ == '__main__':
     args = parse_args()

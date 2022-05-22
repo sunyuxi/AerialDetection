@@ -79,10 +79,12 @@ class SingleRoIExtractor(nn.Module):
         target_lvls = self.map_roi_levels(rois, num_levels)
         roi_feats = torch.cuda.FloatTensor(rois.size()[0], self.out_channels,
                                            out_size, out_size).fill_(0)
+        print(('sunyuxi_target_lvls', type(target_lvls), target_lvls.shape, num_levels))
         for i in range(num_levels):
             inds = target_lvls == i
             if inds.any():
                 rois_ = rois[inds, :]
                 roi_feats_t = self.roi_layers[i](feats[i], rois_)
+                print(('sunyuxi_roi_feats_t', type(roi_feats_t), roi_feats_t.shape))
                 roi_feats[inds] += roi_feats_t
         return roi_feats
